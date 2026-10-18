@@ -61,7 +61,7 @@ pio run -e waveshare_epaper_397
 
 Windows 可使用 `.venv\Scripts\activate` 激活环境。首次构建会下载 ESP32 工具链、SDK 依赖，并执行字体和资源生成，耗时取决于网络与主机。更多信息见 [构建说明](docs/engineering/build-system.md)。
 
-主要输出位于本项目配置的 `.pio/waveshare_epaper_397/`：
+默认主要输出位于 `.pio/build/waveshare_epaper_397/`；若设置 `PLATFORMIO_BUILD_DIR`，则以该目录下的 `waveshare_epaper_397/` 为准：
 
 - `firmware.bin`：应用镜像，不含完整首次安装所需的引导与分区信息。
 - `firmware.factory.bin`：该目标构建生成的合并镜像。
