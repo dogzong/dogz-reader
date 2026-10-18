@@ -1,0 +1,4 @@
+[submodule "freeink-sdk"]
+	path = freeink-sdk
+	url = https://github.com/dogzong/freeink-sdk.git
+	branch = main

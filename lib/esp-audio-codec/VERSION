@@ -1,0 +1,4 @@
+esp-adf-libs esp_audio_codec v2.6.2
+upstream commit a1c9747e62e9f78444570ce6dfb0c4143de98393
+Target archive: ESP32-S3
+Only the simple decoder and codec archives for the Waveshare ESP32-S3 target are included.
