@@ -45,6 +45,8 @@ cd dogz-reader
 
 已有工作副本可运行 `git submodule update --init --recursive`。配套 [FreeInk SDK](https://github.com/dogzong/freeink-sdk) 固定到具体提交，需保留该版本以复现当前代码。
 
+**当前配套 SDK 仍为私有仓库，等待独立公开授权；没有读取权限的用户暂时无法递归拉取或完成构建。** 下述构建步骤以能够访问 SDK 为前提。
+
 ## 构建
 
 安装 Git、Python 和 PlatformIO Core，并准备可访问依赖下载站点的网络环境：
