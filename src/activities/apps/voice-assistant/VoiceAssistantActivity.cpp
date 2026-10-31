@@ -16,6 +16,7 @@
 #include <cstring>
 #include <ctime>
 
+#include "activities/apps/audio/BackgroundAudio.h"
 #include "MappedInputManager.h"
 #include "NetworkStartup.h"
 #include "VoiceDebug.h"
@@ -198,7 +199,7 @@ DebugAsk debugAskRequest;
 
 void VoiceAssistantActivity::onEnter() {
   Activity::onEnter();
-  HalAudioOutput::shutdown();
+  BackgroundAudio::stop();
   config_.load();
   state_.store(State::Home, std::memory_order_release);
   pagesReady_ = false;
@@ -1181,7 +1182,7 @@ void VoiceAssistantActivity::loop() {
         launch(Work::Cancel);
       }
     } else if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-      finish();
+      activityManager.goToApps();
     }
   } else if (state == State::Consent) {
     if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {

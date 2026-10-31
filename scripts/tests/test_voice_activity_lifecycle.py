@@ -73,6 +73,8 @@ struct GfxRenderer {
 };
 struct HalDisplay { static constexpr int FAST_REFRESH = 0; };
 struct HalAudioOutput { static void shutdown() {} };
+namespace BackgroundAudio { void stop() {} }
+struct FakeManager { bool apps = false; void goToApps() { apps = true; } } activityManager;
 struct Wifi { int status() { return 0; } void disconnect(bool) {} } WiFi;
 struct Metrics { int topPadding = 5, headerHeight = 20; };
 struct Theme {
@@ -185,21 +187,19 @@ int main() {
   GfxRenderer r; MappedInputManager input;
   VoiceAssistantActivity a(r,input);
   a.onEnter();
-  assert(a.mainTab() == MainTab::VoiceAssistant);
-  a.selectMainTabContentEdge(MainTabContentEdge::Last); assert(a.selected_ == 5);
-  a.selectMainTabContentEdge(MainTabContentEdge::First); assert(a.selected_ == 0);
+  assert(a.mainTab() == MainTab::None);
   assert(a.active_ && a.work_ == W::Wifi);
   // A radio warm-up must not swallow menu navigation or Back.
   input.pressed = static_cast<int>(MappedInputManager::Button::Down);
   a.loop(); assert(a.selected_ == 1);
   input.pressed = static_cast<int>(MappedInputManager::Button::Back);
-  a.loop(); assert(a.finished);
+  a.loop(); assert(activityManager.apps);
   input.pressed = -1;
   finishWorker(a);
   // Every visible state goes through clear + panel refresh.
   for (S s: {S::Home,S::Settings,S::History,S::Answer,S::Transcript,S::Recording,S::Busy,S::Error}) {
     a.state_ = s; int clears=r.clears, refreshes=r.refreshes;
-    assert(a.mainTab() == (s == S::Home ? MainTab::VoiceAssistant : MainTab::None));
+    assert(a.mainTab() == MainTab::None);
     { RenderLock lock; a.render(std::move(lock)); }
     assert(r.clears == clears+1 && r.refreshes == refreshes+1);
   }

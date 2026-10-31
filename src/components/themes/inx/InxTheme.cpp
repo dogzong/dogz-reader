@@ -86,6 +86,7 @@ const uint8_t* iconForTab(const MainTab tab) {
       return InxAppsTabIcon;
 #endif
     case MainTab::None:
+    case MainTab::Music:
     case MainTab::VoiceAssistant:
       return nullptr;
   }
@@ -452,7 +453,17 @@ void InxTheme::drawMainTabBar(const GfxRenderer& renderer, const Rect rect, cons
     const int left = rect.x + bounds.left;
     const int right = rect.x + bounds.right;
     const int iconX = left + (right - left - kIconSize) / 2;
-    if (tab == MainTab::VoiceAssistant) {
+    if (tab == MainTab::Music) {
+      const auto& icon = InxAppIcons::Music;
+      for (int y = 0; y < kIconSize; ++y) {
+        for (int x = 0; x < kIconSize; ++x) {
+          const int sx = x * InxAppIcons::size / kIconSize;
+          const int sy = y * InxAppIcons::size / kIconSize;
+          if ((icon[sy * (InxAppIcons::size / 8) + sx / 8] & (0x80 >> (sx % 8))) == 0)
+            renderer.drawPixel(iconX + x, iconY + y, true);
+        }
+      }
+    } else if (tab == MainTab::VoiceAssistant) {
       const char* label = tr(STR_AI_TITLE);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, label);
       renderer.drawText(SMALL_FONT_ID, left + (right - left - textWidth) / 2,

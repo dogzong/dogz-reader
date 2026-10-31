@@ -15,6 +15,13 @@ class AudioActivity final : public Activity {
       : Activity(musicApp ? "Music" : "Audio", renderer, mappedInput), musicApp_(musicApp) {}
 
   void onEnter() override;
+  MainTab mainTab() const override {
+    return musicApp_ && state_.load(std::memory_order_acquire) == State::Browser ? MainTab::Music : MainTab::None;
+  }
+  void selectMainTabContentEdge(MainTabContentEdge edge) override {
+    RenderLock lock(*this);
+    selectedEntry_ = MainTabs::contentEdgeIndex(edge, static_cast<int>(entries_.size()));
+  }
   bool ownsAudio() const override { return true; }
   void onExit() override;
   void loop() override;

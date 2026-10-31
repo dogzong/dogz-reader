@@ -20,6 +20,7 @@ struct MappedInputManager {
  bool wasReleased(Button b)const{return release&(1u<<unsigned(b));}
 };
 namespace HalAudioOutput { void shutdown() {} }
+namespace BackgroundAudio { void stop() {} }
 void* playbackFile=nullptr;
 struct File {bool isOpen(){return false;}void close(){}};
 struct Player {

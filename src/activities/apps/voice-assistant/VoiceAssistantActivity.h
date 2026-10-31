@@ -12,13 +12,6 @@ class VoiceAssistantActivity final : public Activity {
   VoiceAssistantActivity(GfxRenderer& renderer, MappedInputManager& input)
       : Activity("VoiceAssistant", renderer, input) {}
   void onEnter() override;
-  MainTab mainTab() const override {
-    return state_.load(std::memory_order_acquire) == State::Home ? MainTab::VoiceAssistant : MainTab::None;
-  }
-  void selectMainTabContentEdge(MainTabContentEdge edge) override {
-    RenderLock lock(*this);
-    selected_ = MainTabs::contentEdgeIndex(edge, 6);
-  }
   bool ownsAudio() const override { return true; }
   void onExit() override;
   void loop() override;

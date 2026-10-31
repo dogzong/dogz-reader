@@ -30,6 +30,7 @@
 #include "apps/weread/WeReadActivity.h"
 #endif
 #include "apps/audio/AudioActivity.h"
+#include "apps/audio/BackgroundAudio.h"
 #if !FREEINK_DEVICE_WAVESHARE_EPAPER_397
 #include "apps/gomoku/GomokuMenuActivity.h"
 #endif
@@ -467,8 +468,13 @@ void ActivityManager::goToMainTab(const MainTab tab) {
     case MainTab::Statistics:
       goToReadingStats();
       return;
+    case MainTab::Music:
+      goToMusic();
+      return;
     case MainTab::VoiceAssistant:
+#if FREEINK_DEVICE_WAVESHARE_EPAPER_397
       goToVoiceAssistant();
+#endif
       return;
     case MainTab::Apps:
       goToApps();
@@ -634,9 +640,12 @@ void ActivityManager::popActivity() {
   pendingAction = PendingAction::Pop;
 }
 
-bool ActivityManager::ownsAudio() const { return currentActivity && currentActivity->ownsAudio(); }
+bool ActivityManager::ownsAudio() const {
+  BackgroundAudio::cleanupFinished();
+  return BackgroundAudio::active() || (currentActivity && currentActivity->ownsAudio());
+}
 
-bool ActivityManager::preventAutoSleep() const { return currentActivity && currentActivity->preventAutoSleep(); }
+bool ActivityManager::preventAutoSleep() const { return BackgroundAudio::active() || (currentActivity && currentActivity->preventAutoSleep()); }
 
 bool ActivityManager::requiresExclusiveStorageLoop() const {
   return currentActivity && currentActivity->requiresExclusiveStorageLoop();

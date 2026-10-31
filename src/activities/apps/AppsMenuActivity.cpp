@@ -56,6 +56,7 @@ constexpr AppEntry kAppEntries[] = {
 #endif
     {AppId::Woodfish, StrId::STR_WOODFISH_TITLE, UIIcon::Woodfish, &ActivityManager::goToWoodfish},
 #if FREEINK_DEVICE_WAVESHARE_EPAPER_397
+    {AppId::VoiceAssistant, StrId::STR_AI_TITLE, UIIcon::Voice, &ActivityManager::goToVoiceAssistant},
     {AppId::Audio, StrId::STR_AUDIO_TITLE, UIIcon::Audio, &ActivityManager::goToAudio},
     {AppId::Music, StrId::STR_AUDIO_MUSIC, UIIcon::Music, &ActivityManager::goToMusic},
 #endif

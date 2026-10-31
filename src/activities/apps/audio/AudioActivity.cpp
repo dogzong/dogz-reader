@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "AudioDuration.h"
+#include "BackgroundAudio.h"
 #include "CrossPointSettings.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "components/SubpageLayout.h"
@@ -107,7 +108,8 @@ void makeWavHeader(uint8_t header[44], uint32_t pcmBytes) {
 
 void AudioActivity::onEnter() {
   Activity::onEnter();
-  HalAudioOutput::shutdown();
+  if (!musicApp_) BackgroundAudio::stop();
+  BackgroundAudio::cleanupFinished();
   state_.store(State::Home, std::memory_order_release);
   samplesWritten_.store(0, std::memory_order_relaxed);
   lastRenderSecond_ = UINT32_MAX;
@@ -126,15 +128,30 @@ void AudioActivity::onEnter() {
   playbackFromBrowser_ = false;
   errorFromBrowser_ = false;
   // Do not scan FAT free space here: it can block the UI on large cards.
-  if (musicApp_) openBrowser(true);
+  if (musicApp_) {
+    openBrowser(true);
+    auto& bg = BackgroundAudio::session();
+    if (BackgroundAudio::active()) {
+      path_ = bg.path; songTitle_ = bg.title; artist_ = bg.artist; coverPath_ = bg.cover;
+      durationSeconds_ = bg.duration; durationEstimated_ = bg.estimated; volume_ = bg.volume;
+      const auto slash = path_.find_last_of('/');
+      const auto name = path_.substr(slash == std::string::npos ? 0 : slash + 1);
+      const auto it = std::find(entries_.begin(), entries_.end(), name);
+      if (it != entries_.end()) selectedEntry_ = it - entries_.begin();
+      playbackFromBrowser_ = true;
+      state_.store(State::Playing, std::memory_order_release);
+    }
+  }
   requestUpdate();
 }
 
 void AudioActivity::onExit() {
   if (state_.load(std::memory_order_acquire) == State::Recording) requestStopRecording();
   while (workerActive_.load(std::memory_order_acquire)) vTaskDelay(pdMS_TO_TICKS(10));
-  HalAudioOutput::shutdown();
-  playbackFile = nullptr;
+  if (!(musicApp_ && BackgroundAudio::active())) {
+    BackgroundAudio::stop();
+    playbackFile = nullptr;
+  }
   if (file_.isOpen()) file_.close();
   if (volumeDirty_ && Storage.ensureDirectoryExists("/.crosspoint")) {
     HalFile setting;
@@ -227,9 +244,8 @@ void AudioActivity::openBrowser(const bool music) {
 }
 
 void AudioActivity::stopPlayback() {
-  HalAudioOutput::shutdown();
+  BackgroundAudio::stop();
   playbackFile = nullptr;
-  if (file_.isOpen()) file_.close();
   state_.store(State::Browser, std::memory_order_release);
   requestUpdate();
 }
@@ -314,22 +330,24 @@ void AudioActivity::requestStopRecording() {
 }
 
 bool AudioActivity::startPlayback() {
-  if (path_.empty() || !Storage.openFileForRead("Audio", path_, file_)) {
+  BackgroundAudio::stop();
+  auto& playback = BackgroundAudio::session().file;
+  if (path_.empty() || !Storage.openFileForRead("Audio", path_, playback)) {
     state_.store(State::Error, std::memory_order_release);
     requestUpdate();
     return false;
   }
   playbackFromBrowser_ = state_.load(std::memory_order_acquire) == State::Browser;
-  const auto duration = readDuration(file_, hasMp3Extension(path_));
+  const auto duration = readDuration(playback, hasMp3Extension(path_));
   durationSeconds_ = duration.seconds;
   durationEstimated_ = duration.estimated;
-  file_.seek(0);
-  playbackFile = &file_;
+  playback.seek(0);
+  playbackFile = &playback;
   const bool started = hasMp3Extension(path_) ? HalAudioOutput::playMp3(readPlayback, seekPlayback, volume_)
                                               : HalAudioOutput::playWav(readPlayback, seekPlayback, false, volume_);
   if (!started) {
     playbackFile = nullptr;
-    file_.close();
+    playback.close();
     state_.store(State::Error, std::memory_order_release);
     errorFromBrowser_ = playbackFromBrowser_;
     requestUpdate();
@@ -356,6 +374,9 @@ bool AudioActivity::startPlayback() {
     else if (Storage.exists("/Music/cover.bmp"))
       coverPath_ = "/Music/cover.bmp";
   }
+  auto& bg = BackgroundAudio::session();
+  bg.music = musicApp_; bg.path = path_; bg.title = songTitle_; bg.artist = artist_;
+  bg.cover = coverPath_; bg.duration = durationSeconds_; bg.estimated = durationEstimated_; bg.volume = volume_;
   lastPlaybackRefresh_ = millis();
   state_.store(State::Playing, std::memory_order_release);
   requestUpdate();
@@ -368,6 +389,7 @@ void AudioActivity::changeVolume(const int delta) {
   volume_ = next;
   volumeDirty_ = true;
   HalAudioOutput::setVolume(volume_);
+  if (musicApp_) BackgroundAudio::session().volume = volume_;
   requestUpdate();
 }
 
@@ -388,8 +410,10 @@ void AudioActivity::loop() {
         state_.store(State::Home, std::memory_order_release);
       }
       requestUpdate();
-    } else if (state == State::Playing)
-      stopPlayback();
+    } else if (state == State::Playing) {
+      if (musicApp_ && !HalAudioOutput::isPaused()) activityManager.goToApps();
+      else stopPlayback();
+    }
     else
       activityManager.goToApps();
     return;
@@ -438,9 +462,8 @@ void AudioActivity::loop() {
   }
   if (state == State::Playing && mappedInput.wasReleased(MappedInputManager::Button::Up) && playbackFromBrowser_ &&
       !entries_.empty()) {
-    HalAudioOutput::shutdown();
+    BackgroundAudio::stop();
     playbackFile = nullptr;
-    if (file_.isOpen()) file_.close();
     state_.store(State::Browser, std::memory_order_release);
     const size_t previous = (selectedEntry_ + entries_.size() - 1) % entries_.size();
     playBrowserEntry(previous);
@@ -448,9 +471,8 @@ void AudioActivity::loop() {
   }
   if (state == State::Playing && mappedInput.wasReleased(MappedInputManager::Button::Down) && playbackFromBrowser_ &&
       !entries_.empty()) {
-    HalAudioOutput::shutdown();
+    BackgroundAudio::stop();
     playbackFile = nullptr;
-    if (file_.isOpen()) file_.close();
     state_.store(State::Browser, std::memory_order_release);
     const size_t next = (selectedEntry_ + 1) % entries_.size();
     playBrowserEntry(next);
@@ -469,9 +491,8 @@ void AudioActivity::loop() {
     return;
   }
   if (state == State::Playing && !HalAudioOutput::isPlaying()) {
-    HalAudioOutput::shutdown();
+    BackgroundAudio::stop();
     playbackFile = nullptr;
-    if (file_.isOpen()) file_.close();
     state_.store(playbackFromBrowser_ ? State::Browser : State::Saved, std::memory_order_release);
     requestUpdate();
     return;
@@ -506,7 +527,7 @@ void AudioActivity::render(RenderLock&&) {
     renderPlayer(player);
     return;
   }
-  GUI.drawHeader(renderer, header, pageTitle);
+  drawPageHeader(header, pageTitle);
   const Rect body = pageContentRect();
   const Rect list{body.x + 12, body.y + 12, std::max(1, body.width - 24), std::max(1, body.height - 24)};
   if (state == State::Home) {
@@ -522,13 +543,13 @@ void AudioActivity::render(RenderLock&&) {
       const char* empty = tr(STR_AUDIO_NO_FILES);
       renderer.drawText(UI_12_FONT_ID, body.x + 16, body.y + body.height / 2, empty, true);
     } else {
-      GUI.drawList(renderer, list, entries_.size(), selectedEntry_, [this](int i) { return entries_[i]; });
+      GUI.drawList(renderer, list, entries_.size(), showMainTabContentSelection() ? static_cast<int>(selectedEntry_) : -1, [this](int i) { return entries_[i]; });
     }
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+    const auto labels = mainTabButtonLabels(tr(STR_BACK), tr(STR_OPEN), !entries_.empty());
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     if (!entries_.empty()) {
       const char* hint = tr(STR_AUDIO_DELETE_HINT);
-      renderer.drawText(UI_10_FONT_ID, body.x + 12, body.y + body.height - 12, hint, true);
+      renderer.drawText(UI_10_FONT_ID, body.x + 12, body.y + body.height - renderer.getLineHeight(UI_10_FONT_ID) - 4, hint, true);
     }
     renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     return;

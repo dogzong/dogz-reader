@@ -8,7 +8,7 @@
 #include "components/Rect.h"
 #include "components/UiHighDpiProfile.h"
 
-enum class MainTab : uint8_t { None, Recent, Library, Apps, Settings, Statistics, VoiceAssistant };
+enum class MainTab : uint8_t { None, Recent, Library, Apps, Settings, Statistics, VoiceAssistant, Music };
 enum class MainTabFocus : uint8_t { Tabs, Content };
 enum class MainTabContentEdge : uint8_t { First, Last };
 
@@ -24,7 +24,7 @@ inline constexpr int statusBarHeight = UiHighDpiProfile::enabled ? UiHighDpiProf
 inline constexpr int bottomBarHeight = UiHighDpiProfile::enabled ? UiHighDpiProfile::navigationHeight : 56;
 inline constexpr std::array<MainTab, 5> values = {MainTab::Recent, MainTab::Library, MainTab::Apps, MainTab::Settings,
 #if FREEINK_DEVICE_WAVESHARE_EPAPER_397
-                                                  MainTab::VoiceAssistant};
+                                                  MainTab::Music};
 #else
                                                   MainTab::Statistics};
 #endif
